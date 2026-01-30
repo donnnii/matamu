@@ -41,13 +41,13 @@ pip install webdriver-manager
 pip install fastapi uvicorn
 ````
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 9090
+uvicorn app:app --host 0.0.0.0 --port 8000
 ````
 
 Setelah dijalankan, API dapat diakses melalui:
 
 ```
-http://localhost:9090
+http://localhost:8000
 ```
 
 ---
@@ -57,7 +57,7 @@ http://localhost:9090
 ### Endpoint
 
 ```
-http://localhost:9090
+http://localhost:8000/geocode
 ```
 
 ### Metode
@@ -106,10 +106,10 @@ Format: **JSON**
 
 ```json
 {
-  "lat": -6.123456,
-  "long": 110.123456,
-  "jarak": 1.23,
-  "valid": "Y"
+    "lat": "-6.6004219",
+    "long": "110.6632625",
+    "jarak": 0.369,
+    "valid": "Y"
 }
 ```
 
@@ -130,7 +130,7 @@ Keterangan:
 Gunakan node **HTTP Request** dengan konfigurasi:
 
 * Method: `POST`
-* URL: `http://localhost:9090`
+* URL: `http://localhost:8000/geocode`
 * Body Type: `JSON`
 * Isi payload sesuai format di atas
 

@@ -27,10 +27,21 @@ Jalankan perintah berikut di Terminal / CMD:
 
 ```bash
 python -m venv venv
+````
+```bash
 venv\Scripts\activate
+````
+```bash
 pip install selenium
+````
+```bash
 pip install webdriver-manager
-python main.py
+````
+```bash
+pip install fastapi uvicorn
+````
+```bash
+uvicorn app:app --host 0.0.0.0 --port 9090
 ````
 
 Setelah dijalankan, API dapat diakses melalui:
@@ -77,6 +88,16 @@ Keterangan:
 * **kecamatan** : Nama kecamatan
 * **kabupaten** : Nama kabupaten
 
+Contoh: **JSON**
+
+```json
+{
+  "query": "BPS Kabupaten Jepara",
+  "desa": "demaan",
+  "kecamatan": "jepara",
+  "kabupaten": "jepara"
+}
+```
 ---
 
 ## 📥 Response

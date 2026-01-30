@@ -118,13 +118,5 @@ Gunakan node **HTTP Request** dengan konfigurasi:
 ## ⚠️ Catatan
 
 * Pastikan Google Chrome terinstal
-* Selenium akan membuka browser secara otomatis
+* Selenium akan membuka browser secara otomatis (headless)
 * Gunakan dengan bijak untuk menghindari deteksi sebagai bot
-
----
-
-## 📌 Lisensi
-
-Bebas digunakan untuk keperluan internal dan pengembangan.
-
-```

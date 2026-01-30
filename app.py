@@ -97,7 +97,8 @@ def geocode(data: dict):
     url_lokasi = "https://www.google.com/maps/search/?api=1&query=" + query2
     driver.get(url_lokasi)
 
-    WebDriverWait(driver, 20).until(EC.url_changes(url_lokasi))
+    # tunggu sampai URL mengandung koordinat (@lat,long)
+    WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
 
     url_lokasi_final = driver.current_url
 
@@ -106,7 +107,7 @@ def geocode(data: dict):
     url_desa = "https://www.google.com/maps/search/?api=1&query=" + desa3
     driver.get(url_desa)
 
-    WebDriverWait(driver, 20).until(EC.url_changes(url_desa))
+    WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
 
     url_desa_final = driver.current_url
 

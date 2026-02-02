@@ -109,8 +109,9 @@ def process_single_row(row):
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    profile_dir = f"C:\\temp\\chrome_profile_{uuid.uuid4().hex}"
-    options.add_argument(f"--user-data-dir={profile_dir}")
+    options.add_argument("--incognito") # <--- Added Incognito
+    
+    # Removed profile_dir creation to save disk space
     
     driver = webdriver.Chrome(options=options)
 

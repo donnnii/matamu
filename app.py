@@ -1,47 +1,41 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from fastapi import FastAPI
-import re, math
-import urllib.parse
-import os
+from concurrent.futures import ThreadPoolExecutor
+import re, math, urllib.parse, os, uuid, threading, datetime, asyncio
 
 app = FastAPI()
 
+# =========================
+# THREAD POOL (10 paralel)
+# =========================
+executor = ThreadPoolExecutor(max_workers=10)
 
-# CLEAR CONSOLE
-def cls():
-    os.system('cls' if os.name=='nt' else 'clear')
+# =========================
+# LOG HELPER
+# =========================
+def log(msg):
+    now = datetime.datetime.now().strftime("%H:%M:%S")
+    thread_name = threading.current_thread().name
+    print(f"[{now}] [{thread_name}] {msg}")
 
-cls()
-print("---------------------------------------------------------------")
-print("API GEOCODING READY! - HUBUNGKAN DENGAN N8N VIA PORT 8000")
-print("---------------------------------------------------------------")
-print()
-print()
-
+# =========================
 # FUNGSI EKSTRAK LAT LONG
+# =========================
 def extract_poi_info(google_maps_url):
-    """
-    Extract POI dan lat/lon dari URL Google Maps.
-    Returns: (name, lat, lon)
-    """
-
-    # 1. Extract POI coordinates from !3d !4d
     coord_match = re.search(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)', google_maps_url)
     lat = lon = None
     if coord_match:
         lat = coord_match.group(1)
         lon = coord_match.group(2)
     else:
-        # fallback to @lat,lon
         fallback = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', google_maps_url)
         if fallback:
             lat = fallback.group(1)
             lon = fallback.group(2)
 
-    # 2. Extract POI name from /place/...
     name_match = re.search(r'/place/([^/]+)/', google_maps_url)
     name = None
     if name_match:
@@ -50,11 +44,11 @@ def extract_poi_info(google_maps_url):
 
     return name, lat, lon
 
-
-#FUNGSI HITUNG JARAK DARI 2 LAT LONG
-
+# =========================
+# HITUNG JARAK
+# =========================
 def calculate_distance(lat1, lon1, lat2, lon2):
-    R = 6371  # km
+    R = 6371
     lat1 = math.radians(float(lat1))
     lon1 = math.radians(float(lon1))
     lat2 = math.radians(float(lat2))
@@ -67,94 +61,74 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
-@app.post("/geocode")
-def geocode(data: dict):
+# =========================
+# CORE FUNCTION (1 JOB)
+# =========================
+def process_geocode(data):
     query = data["query"]
     desa = data["desa"]
     kecamatan = data["kecamatan"]
     kabupaten = data["kabupaten"]
-    
-    cls()
-    print("MENERIMA DATA")
-    print("QUERY:")
-    print(query)
-    print()
-    print("-------------------------------------")
-    
+
+    log(f"START → {query} | {desa}, {kabupaten}")
+
     query2 = query.replace(" ", "+")
-    
-    desa2 = "desa " + desa + " kabupaten " + kabupaten
-    
+    desa2 = f"desa {desa} kabupaten {kabupaten}"
     desa3 = desa2.replace(" ", "+")
-    
+
     options = Options()
-    options.add_argument("--headless")  # disabled for debugging
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    profile_dir = f"C:\\temp\\chrome_profile_{uuid.uuid4().hex}"
+    options.add_argument(f"--user-data-dir={profile_dir}")
 
     driver = webdriver.Chrome(options=options)
 
-    #cari titik lokasi
+    try:
+        url_lokasi = "https://www.google.com/maps/search/?api=1&query=" + query2
+        driver.get(url_lokasi)
+        WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
+        url_lokasi_final = driver.current_url
 
-    url_lokasi = "https://www.google.com/maps/search/?api=1&query=" + query2
-    driver.get(url_lokasi)
+        url_desa = "https://www.google.com/maps/search/?api=1&query=" + desa3
+        driver.get(url_desa)
+        WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
+        url_desa_final = driver.current_url
 
-    # tunggu sampai URL mengandung koordinat (@lat,long)
-    WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
+        name, lat, lon = extract_poi_info(url_lokasi_final)
+        name2, lat2, lon2 = extract_poi_info(url_desa_final)
 
-    url_lokasi_final = driver.current_url
+        distance_km = calculate_distance(lat, lon, lat2, lon2)
+        valid = "Y" if distance_km < 3 else "N"
 
-    #cari titik tengah desa
+        log(f"DONE  → {query} | lat={lat}, lon={lon}, jarak={round(distance_km,3)} km, valid={valid}")
 
-    url_desa = "https://www.google.com/maps/search/?api=1&query=" + desa3
-    driver.get(url_desa)
+        return {
+            "lat": lat,
+            "long": lon,
+            "jarak": round(distance_km, 3),
+            "valid": valid
+        }
 
-    WebDriverWait(driver, 20).until(lambda d: "@" in d.current_url)
+    except TimeoutException:
+        log(f"TIMEOUT → {query}")
+        return {"error": "Timeout while loading Google Maps"}
 
-    url_desa_final = driver.current_url
+    except Exception as e:
+        log(f"ERROR → {query} | {str(e)}")
+        return {"error": str(e)}
 
-    # print("URL LOKASI : ", url_lokasi_final)
-    # print("URL DESA : ", url_desa_final)
+    finally:
+        driver.quit()
+        log(f"CLOSE  → {query}")
 
-    name, lat, lon = extract_poi_info(url_lokasi_final)
-    
-    # CLEAR SCREEN
-        
-    print("BERHASIL DIPROSES")
-    print("-------------------------------------")
-    print()
-
-    print("LOKASI TITIK USAHA:")
-    print("Latitude :", lat)
-    print("Longitude:", lon)
-    print()
-
-    name2, lat2, lon2 = extract_poi_info(url_desa_final)
-
-    print("LOKASI TITIK TENGAH DESA:")
-    print("Latitude :", lat2)
-    print("Longitude:", lon2)
-    print()
-
-    distance_km = calculate_distance(lat, lon, lat2, lon2)
-
-    print("JARAK ANTARA TITIK USAHA DENGAN TENGAH DESA :", round(distance_km, 3), " km")
-
-    if distance_km < 3:
-        print("Jarak Kurang dari 3km, Valid")
-        valid = "Y"
-    else:
-        print("Jarak Lebih dari 3km, Not valid")
-        valid = "N"
-    driver.quit()
-    
-    print()
-    print()
-
-    if lat is None or lat is None:
-        return {"error": "Could not extract coordinates"}
-
-    return {
-        "lat": lat,
-        "long": lon,
-        "jarak": round(distance_km, 3),
-        "valid": valid
-    }
+# =========================
+# FASTAPI ENDPOINT
+# =========================
+@app.post("/geocode")
+async def geocode(data: dict):
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(executor, process_geocode, data)
+    return result
